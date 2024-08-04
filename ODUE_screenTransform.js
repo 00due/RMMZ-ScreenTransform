@@ -1,7 +1,7 @@
 
 
 /*:
- * @plugindesc (Ver 1.0) Transform the screen with a variety of animations.
+ * @plugindesc (Ver 1.1) Transform the screen with a variety of animations.
  * @author ODUE
  * @url https://github.com/00due/screenTransform-MZ
  * @target MZ MV
@@ -35,7 +35,13 @@
  * 5. You can send feature requests to me on platforms such as Reddit (to u/SanttuPOIKA----).
  *    However, I have no obligation to fulfill your requests.
  * 
- * 
+ * @param useScaling
+ * @text Enable scale on screen w/o HUD
+ * @desc Use scale on screen w/o HUD. This disables RPG Maker's default "Zoom" command.
+ * @type boolean
+ * @default true
+ * @on yes
+ * @off no
  * 
  * @command scale
  * @text Scale / strech
@@ -325,9 +331,15 @@
  * @value 2
  * @default 0
  * 
+ * 
 */
+
+/*const { createNoise2D } = require('simplex-noise');*/
+/*const simplex = createNoise2D();*/
+
 var OD = OD || {};
 OD._transform = OD._transform || {};
+
 
 OD._transform.easeIn = function(t, b, c, d) {
     return c*(t/=d)*t + b;
@@ -353,6 +365,22 @@ OD._transform.setPivot = function(layer, x, y) {
     this.wait(1);
     this._index--;
 }*/
+
+// Disable updating screen scale because of plugin scale command on SceneManager._scene._spriteset
+const useScaling = PluginManager.parameters('ODUE_screenTransform')['useScaling'] === 'true';
+Spriteset_Base.prototype.updatePosition = function() {
+    const screen = $gameScreen;
+    const scale = screen.zoomScale();
+    if (!useScaling) {
+        this.scale.x = scale;
+        this.scale.y = scale;
+        this.x = Math.round(-screen.zoomX() * (scale - 1));
+        this.y = Math.round(-screen.zoomY() * (scale - 1));
+        this.x += Math.round(screen.shake());
+    }
+    
+};
+
 
 PluginManager.registerCommand('ODUE_screenTransform', 'scale', args => {
     let applyToLayer;
@@ -617,6 +645,47 @@ PluginManager.registerCommand('ODUE_screenTransform', 'skew', args => {
     }
     animateSkew();
 });
+
+
+// THIS IS HEAVILY WORK IN PROGRESS AND THE ALGORITHM IS NOT FINALIZED
+/*PluginManager.registerCommand('ODUE_screenTransform', 'camShake', args => {
+    let applyToLayer;
+    const selectedLayer = SceneManager._scene._spriteset._baseSprite; //applyToLayer;
+    const duration = 99999; // parseInt(args.duration);
+    const shakeMagnitude = 25;
+    const shakeSpeed = 10;
+    const shakeSpeed2 = 0.3;
+    const shakeDuration = 9999999;
+    const start = Date.now();
+    const originalX = selectedLayer.x;
+    const originalY = selectedLayer.y;
+    let frame = 0;
+
+    animateShake = function() {
+        frame++;
+        const elapsed = (Date.now() - start) * 0.001;
+        let t = elapsed * shakeSpeed; // time factor
+
+        const noiseX = simplex(t * 0.1, 0);
+        const noiseY = simplex(0, t * 0.1);
+        
+
+        const x = (noiseX + Math.sin(t * 0.3)) * shakeMagnitude;
+        const y = (noiseY + Math.cos(t * 0.3)) * shakeMagnitude;
+        
+        selectedLayer.x = x;
+        selectedLayer.y = y;
+        if (frame < duration) {
+            requestAnimationFrame(animateShake);
+        } else {
+            selectedLayer.x = 0;
+            selectedLayer.y = 0;
+        }
+    }
+    animateShake();
+});*/
+
+
 
 PluginManager.registerCommand('ODUE_screenTransform', 'reset', args => {
     let applyToLayer;
