@@ -1,7 +1,7 @@
 
 
 /*:
- * @plugindesc (Ver 1.1) Transform the screen with a variety of animations.
+ * @plugindesc (Ver 1.2) Transform the screen with a variety of animations.
  * @author ODUE
  * @url https://github.com/00due/screenTransform-MZ
  * @target MZ MV
@@ -314,6 +314,44 @@
  * @value 2
  * @default 0
  * 
+ * @command cshk2
+ * @text Smooth camera shake
+ * @desc Smooth camera shake, because the original one is just bad.
+ * 
+ * @arg duration
+ * @text Shake duration
+ * @desc Duration of the animation in frames (0 = infinite).
+ * @type number
+ * @default 60
+ * @min 0
+ * 
+ * @arg endDuration
+ * @text Duration to end
+ * @desc How quickly the shake will stop (if not using infinite shake)
+ * @default 60
+ * @min 1
+ * 
+ * @arg magnitude
+ * @text Shake magnitude
+ * @desc How much the screen will shake.
+ * @type number
+ * @default 25
+ * 
+ * @arg speed
+ * @text Shake speed
+ * @desc How quickly does the screen shake
+ * @default 100
+ * @min 1
+ * 
+ * @arg layer
+ * @text Use on
+ * @desc Where to apply the transformation. (READ HELP BEFORE USING!)
+ * @type select
+ * @option Map only
+ * @value 0
+ * @option Fullscreen
+ * @value 1
+ * @default 0
  * 
  * @command reset
  * @text Reset
@@ -685,7 +723,67 @@ PluginManager.registerCommand('ODUE_screenTransform', 'skew', args => {
     animateShake();
 });*/
 
+PluginManager.registerCommand('ODUE_screenTransform', 'cshk2', args => {
+    let applyToLayer;
+    if (parseInt(args.layer) === 1) {
+        // Fullscreen
+        applyToLayer = SceneManager._scene;
+    }
+    else if (parseInt(args.layer) === 2) {
+        // Fullscreen without HUD (Disabled for now, because it's broken)
+        applyToLayer = SceneManager._scene._spriteset;
+    }
+    else {
+        // Map only (include map, characters, tileset)
+        applyToLayer = SceneManager._scene._spriteset._baseSprite;
+    }
+    const selectedLayer = applyToLayer;
+    const duration = parseInt(args.duration);
+    const shakeMagnitude = parseInt(args.magnitude);
+    const shakeSpeed = parseInt(args.speed) / 10;
+    const start = Date.now();
+    let frame = 0;
+    let endDuration = parseInt(args.endDuration)
+    let currentEndDuration = 0;
 
+    animateShake = function() {
+        frame++;
+        const elapsed = (Date.now() - start) * 0.001;
+        let t = elapsed * shakeSpeed; // time factor
+
+        const x = Math.sin(t * 1.2) * shakeMagnitude;
+        const y = Math.sin(t) * shakeMagnitude;
+        
+        selectedLayer.x = x;
+        selectedLayer.y = y;
+        if (duration == 0 || frame < duration) {
+            requestAnimationFrame(animateShake);
+        } else {
+            console.log("abufsau");
+            requestAnimationFrame(() => endShake(t));
+            /* selectedLayer.x = 0;
+            selectedLayer.y = 0; */
+        }
+    }
+    animateShake();
+
+    endShake = function(t) {
+        if (currentEndDuration < endDuration) {
+            console.log("End");
+            selectedLayer.x = Math.sin(t * 1.2) * shakeMagnitude * (endDuration + 1 - currentEndDuration) / endDuration;
+            selectedLayer.y = Math.sin(t) * shakeMagnitude * (endDuration - currentEndDuration) / endDuration;
+            currentEndDuration++;
+            const elapsed = (Date.now() - start) * 0.001;
+            t = elapsed * shakeSpeed; // time factor
+            console.log(currentEndDuration + " " + endDuration);
+            requestAnimationFrame(() => endShake(t));
+        }
+        else {
+            selectedLayer.x = 0;
+            selectedLayer.y = 0;
+        }
+    }
+});
 
 PluginManager.registerCommand('ODUE_screenTransform', 'reset', args => {
     let applyToLayer;
