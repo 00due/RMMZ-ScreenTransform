@@ -1,7 +1,7 @@
 
 
 /*:
- * @plugindesc (Ver 1.2) Transform the screen with a variety of animations.
+ * @plugindesc (Ver 1.3) Transform the screen with a variety of animations.
  * @author ODUE
  * @url https://github.com/00due/screenTransform-MZ
  * @target MZ MV
@@ -314,6 +314,7 @@
  * @value 2
  * @default 0
  * 
+ * 
  * @command cshk2
  * @text Smooth camera shake
  * @desc Smooth camera shake, because the original one is just bad.
@@ -351,7 +352,143 @@
  * @value 0
  * @option Fullscreen
  * @value 1
+ * @option Map without parallax
+ * @value 3
  * @default 0
+ * 
+ * 
+ * @command endShake
+ * @text End shake
+ * @desc Stop camera shake.
+ * 
+ * @arg duration
+ * @text Duration
+ * @desc Duration of which it takes for shake to end.
+ * @type number
+ * @default 60
+ * @min 1
+ * 
+ * @arg layer
+ * @text layer
+ * @desc Reset which layer? (Fullscreen DOES NOT include previous layers!)
+ * @type select
+ * @option Map only
+ * @value 0
+ * @option Fullscreen
+ * @value 1
+ * @option Map without parallax
+ * @value 3
+ * @default 0
+ * 
+ * 
+ * 
+ * @command saveScale
+ * @text Save scale
+ * @desc Save the current scale of the screen.
+ * 
+ * @arg layer
+ * @text Save layer
+ * @desc Save which layer?
+ * @type select
+ * @option Map only
+ * @value 0
+ * @option Fullscreen
+ * @value 1
+ * @option Fullscreen w/o UI / HUD
+ * @value 2
+ * @default 0
+ * 
+ * 
+ * @command saveRotation
+ * @text Save rotation
+ * @desc Save the current rotation of the screen.
+ * 
+ * @arg layer
+ * @text Save layer
+ * @desc Save which layer?
+ * @type select
+ * @option Map only
+ * @value 0
+ * @option Fullscreen
+ * @value 1
+ * @option Fullscreen w/o UI / HUD
+ * @value 2
+ * @default 0
+ * 
+ * 
+ * @command restoreScale
+ * @text Restore scale
+ * @desc Restore the saved scale of the screen.
+ * 
+ * @arg duration
+ * @text Animation duration
+ * @desc Duration of the animation in frames.
+ * @type number
+ * @default 60
+ * 
+ * @arg easing
+ * @desc Easing type
+ * @desc Ease in, ease out, ease in-out or constant speed.
+ * @type select
+ * @option Constant speed
+ * @value 0
+ * @option Ease in
+ * @value 1
+ * @option Ease out
+ * @value 2
+ * @option Ease in-out
+ * @value 3
+ * @default 0
+ * 
+ * @arg layer
+ * @text Restore layer
+ * @desc Restore which layer?
+ * @type select
+ * @option Map only
+ * @value 0
+ * @option Fullscreen
+ * @value 1
+ * @option Fullscreen w/o UI / HUD
+ * @value 2
+ * @default 0
+ * 
+ * 
+ * @command restoreRotation
+ * @text Restore rotation
+ * @desc Restore the saved rotation of the screen.
+ * 
+ * @arg duration
+ * @text Animation duration
+ * @desc Duration of the animation in frames.
+ * @type number
+ * @default 60
+ * 
+ * @arg easing
+ * @desc Easing type
+ * @desc Ease in, ease out, ease in-out or constant speed.
+ * @type select
+ * @option Constant speed
+ * @value 0
+ * @option Ease in
+ * @value 1
+ * @option Ease out
+ * @value 2
+ * @option Ease in-out
+ * @value 3
+ * @default 0
+ * 
+ * @arg layer
+ * @text Restore layer
+ * @desc Restore which layer?
+ * @type select
+ * @option Map only
+ * @value 0
+ * @option Fullscreen
+ * @value 1
+ * @option Fullscreen w/o UI / HUD
+ * @value 2
+ * @default 0
+ * 
  * 
  * @command reset
  * @text Reset
@@ -371,9 +508,6 @@
  * 
  * 
 */
-
-/*const { createNoise2D } = require('simplex-noise');*/
-/*const simplex = createNoise2D();*/
 
 var OD = OD || {};
 OD._transform = OD._transform || {};
@@ -398,6 +532,11 @@ OD._transform.setPivot = function(layer, x, y) {
     layer.y = y;
 }
 
+OD._transform.endShake = []
+
+OD._transform.savedScale = [1.0, 1.0];
+OD._transform.savedRotate = 0;
+
 // Off for now
 /*Game_Interpreter.prototype.waitForTransform = function() {
     this.wait(1);
@@ -418,7 +557,6 @@ Spriteset_Base.prototype.updatePosition = function() {
     }
     
 };
-
 
 PluginManager.registerCommand('ODUE_screenTransform', 'scale', args => {
     let applyToLayer;
@@ -471,7 +609,6 @@ PluginManager.registerCommand('ODUE_screenTransform', 'scale', args => {
             default:
                 newScaleX = startScaleX + (targetX - startScaleX) * frame / duration;
                 newScaleY = startScaleY + (targetY - startScaleY) * frame / duration;
-                console.log("constant speed: " + newScaleX);
                 break;
         }
 
@@ -533,7 +670,6 @@ PluginManager.registerCommand('ODUE_screenTransform', 'rotate', args => {
                 break;
             default:
                 newAngle = startAngle + (targetAngle - startAngle) * frame / duration;
-                console.log("constant speed: " + newAngle);
                 break;
         }
 
@@ -600,7 +736,6 @@ PluginManager.registerCommand('ODUE_screenTransform', 'move', args => {
             default:
                 newX = startX + (targetX - startX) * frame / duration;
                 newY = startY + (targetY - startY) * frame / duration;
-                console.log("constant speed: " + newX);
                 break;
         }
 
@@ -667,7 +802,6 @@ PluginManager.registerCommand('ODUE_screenTransform', 'skew', args => {
             default:
                 newX = startX + (targetX - startX) * frame / duration;
                 newY = startY + (targetY - startY) * frame / duration;
-                console.log("constant speed: " + newX);
                 break;
         }
 
@@ -684,45 +818,6 @@ PluginManager.registerCommand('ODUE_screenTransform', 'skew', args => {
     animateSkew();
 });
 
-
-// THIS IS HEAVILY WORK IN PROGRESS AND THE ALGORITHM IS NOT FINALIZED
-/*PluginManager.registerCommand('ODUE_screenTransform', 'camShake', args => {
-    let applyToLayer;
-    const selectedLayer = SceneManager._scene._spriteset._baseSprite; //applyToLayer;
-    const duration = 99999; // parseInt(args.duration);
-    const shakeMagnitude = 25;
-    const shakeSpeed = 10;
-    const shakeSpeed2 = 0.3;
-    const shakeDuration = 9999999;
-    const start = Date.now();
-    const originalX = selectedLayer.x;
-    const originalY = selectedLayer.y;
-    let frame = 0;
-
-    animateShake = function() {
-        frame++;
-        const elapsed = (Date.now() - start) * 0.001;
-        let t = elapsed * shakeSpeed; // time factor
-
-        const noiseX = simplex(t * 0.1, 0);
-        const noiseY = simplex(0, t * 0.1);
-        
-
-        const x = (noiseX + Math.sin(t * 0.3)) * shakeMagnitude;
-        const y = (noiseY + Math.cos(t * 0.3)) * shakeMagnitude;
-        
-        selectedLayer.x = x;
-        selectedLayer.y = y;
-        if (frame < duration) {
-            requestAnimationFrame(animateShake);
-        } else {
-            selectedLayer.x = 0;
-            selectedLayer.y = 0;
-        }
-    }
-    animateShake();
-});*/
-
 PluginManager.registerCommand('ODUE_screenTransform', 'cshk2', args => {
     let applyToLayer;
     if (parseInt(args.layer) === 1) {
@@ -733,9 +828,13 @@ PluginManager.registerCommand('ODUE_screenTransform', 'cshk2', args => {
         // Fullscreen without HUD (Disabled for now, because it's broken)
         applyToLayer = SceneManager._scene._spriteset;
     }
-    else {
+    else if (parseInt(args.layer) === 0) {
         // Map only (include map, characters, tileset)
         applyToLayer = SceneManager._scene._spriteset._baseSprite;
+    }
+    else {
+        // Map without parallax
+        applyToLayer = SceneManager._scene._spriteset._tilemap;
     }
     const selectedLayer = applyToLayer;
     const duration = parseInt(args.duration);
@@ -743,8 +842,9 @@ PluginManager.registerCommand('ODUE_screenTransform', 'cshk2', args => {
     const shakeSpeed = parseInt(args.speed) / 10;
     const start = Date.now();
     let frame = 0;
-    let endDuration = parseInt(args.endDuration)
+    let endDuration = parseInt(args.endDuration);
     let currentEndDuration = 0;
+    let endAnimation = false;
 
     animateShake = function() {
         frame++;
@@ -753,13 +853,25 @@ PluginManager.registerCommand('ODUE_screenTransform', 'cshk2', args => {
 
         const x = Math.sin(t * 1.2) * shakeMagnitude;
         const y = Math.sin(t) * shakeMagnitude;
+
+        //Fixme: Temporary fix when transfering map. I coulnd't get it to work
+        //any other way than this.
+        try {
+            selectedLayer.x = x;
+            selectedLayer.y = y;
+        }
+        catch (e) {}
         
-        selectedLayer.x = x;
-        selectedLayer.y = y;
-        if (duration == 0 || frame < duration) {
+        
+        if ((duration == 0 || frame < duration) &&
+            OD._transform.endShake[0] !== selectedLayer &&
+            OD._transform.endShake[1] != 0) {
             requestAnimationFrame(animateShake);
         } else {
-            console.log("abufsau");
+            if (OD._transform.endShake[1] > 0) {
+                endDuration = OD._transform.endShake[1];
+                OD._transform.endShake = [];
+            }
             requestAnimationFrame(() => endShake(t));
             /* selectedLayer.x = 0;
             selectedLayer.y = 0; */
@@ -769,13 +881,11 @@ PluginManager.registerCommand('ODUE_screenTransform', 'cshk2', args => {
 
     endShake = function(t) {
         if (currentEndDuration < endDuration) {
-            console.log("End");
             selectedLayer.x = Math.sin(t * 1.2) * shakeMagnitude * (endDuration + 1 - currentEndDuration) / endDuration;
             selectedLayer.y = Math.sin(t) * shakeMagnitude * (endDuration - currentEndDuration) / endDuration;
             currentEndDuration++;
             const elapsed = (Date.now() - start) * 0.001;
             t = elapsed * shakeSpeed; // time factor
-            console.log(currentEndDuration + " " + endDuration);
             requestAnimationFrame(() => endShake(t));
         }
         else {
@@ -783,6 +893,179 @@ PluginManager.registerCommand('ODUE_screenTransform', 'cshk2', args => {
             selectedLayer.y = 0;
         }
     }
+});
+
+PluginManager.registerCommand('ODUE_screenTransform', 'endShake', args => {
+    let applyToLayer;
+    if (parseInt(args.layer) === 1) {
+        // Fullscreen   
+        applyToLayer = SceneManager._scene;
+    }
+    else if (parseInt(args.layer) === 2) {
+        // Fullscreen without HUD
+        applyToLayer = SceneManager._scene._spriteset;
+    }
+    else if (parseInt(args.layer) === 0) {
+        // Map only (include map, characters, tileset)
+        applyToLayer = SceneManager._scene._spriteset._baseSprite;
+    }
+    else {
+        // Map without parallax
+        applyToLayer = SceneManager._scene._spriteset._tilemap;
+    }
+    const selectedLayer = applyToLayer;
+    const duration = parseInt(args.duration);
+    OD._transform.endShake = [selectedLayer, duration];
+});
+
+PluginManager.registerCommand('ODUE_screenTransform', 'saveScale', args => {
+    let applyToLayer;
+    if (parseInt(args.layer) === 1) {
+        // Fullscreen
+        applyToLayer = SceneManager._scene;
+    }
+    else if (parseInt(args.layer) === 2) {
+        // Fullscreen without HUD
+        applyToLayer = SceneManager._scene._spriteset;
+    }
+    else {
+        // Map only (include map, characters, tileset)
+        applyToLayer = SceneManager._scene._spriteset._baseSprite;
+    }
+    OD._transform.savedScale = [applyToLayer.scale.x, applyToLayer.scale.y];
+});
+
+PluginManager.registerCommand('ODUE_screenTransform', 'saveRotation', args => {
+    let applyToLayer;
+    if (parseInt(args.layer) === 1) {
+        // Fullscreen
+        applyToLayer = SceneManager._scene;
+    }
+    else if (parseInt(args.layer) === 2) {
+        // Fullscreen without HUD
+        applyToLayer = SceneManager._scene._spriteset;
+    }
+    else {
+        // Map only (include map, characters, tileset)
+        applyToLayer = SceneManager._scene._spriteset._baseSprite;
+    }
+    OD._transform.savedRotate = applyToLayer.angle;
+});
+
+PluginManager.registerCommand('ODUE_screenTransform', 'restoreScale', args => {
+    let applyToLayer;
+    if (parseInt(args.layer) === 1) {
+        // Fullscreen
+        applyToLayer = SceneManager._scene;
+    }
+    else if (parseInt(args.layer) === 2) {
+        // Fullscreen without HUD
+        applyToLayer = SceneManager._scene._spriteset;
+    }
+    else {
+        // Map only (include map, characters, tileset)
+        applyToLayer = SceneManager._scene._spriteset._baseSprite;
+    }
+
+    const selectedLayer = applyToLayer;
+    const targetX = OD._transform.savedScale[0];
+    const targetY = OD._transform.savedScale[1];
+    const duration = parseInt(args.duration);
+    const easing = parseInt(args.easing);
+   
+    const startScaleX = selectedLayer.scale.x;
+    const startScaleY = selectedLayer.scale.y;
+
+    let frame = 0;
+
+    animateScale = function() {
+        frame++;
+        let newScaleX = 0;
+        let newScaleY = 0;
+        switch (easing) {
+            case 1:
+                newScaleX = OD._transform.easeIn(frame, startScaleX, targetX - startScaleX, duration);
+                newScaleY = OD._transform.easeIn(frame, startScaleY, targetY - startScaleY, duration);
+                break;
+            case 2:
+                newScaleX = OD._transform.easeOut(frame, startScaleX, targetX - startScaleX, duration);
+                newScaleY = OD._transform.easeOut(frame, startScaleY, targetY - startScaleY, duration);
+                break;
+            case 3:
+                newScaleX = OD._transform.easeInOut(frame, startScaleX, targetX - startScaleX, duration);
+                newScaleY = OD._transform.easeInOut(frame, startScaleY, targetY - startScaleY, duration);
+                break;
+            default:
+                newScaleX = startScaleX + (targetX - startScaleX) * frame / duration;
+                newScaleY = startScaleY + (targetY - startScaleY) * frame / duration;
+                break;
+        }
+
+        selectedLayer.scale.x = newScaleX;
+        selectedLayer.scale.y = newScaleY;
+        if (frame < duration) {
+            requestAnimationFrame(animateScale);
+            
+        } else {
+            selectedLayer.scale.x = targetX;
+            selectedLayer.scale.y = targetY;
+        }
+        
+    }
+
+    animateScale();
+});
+
+PluginManager.registerCommand('ODUE_screenTransform', 'restoreRotation', args => {
+    let applyToLayer;
+    if (parseInt(args.layer) === 1) {
+        // Fullscreen
+        applyToLayer = SceneManager._scene;
+    }
+    else if (parseInt(args.layer) === 2) {
+        // Fullscreen without HUD
+        applyToLayer = SceneManager._scene._spriteset;
+    }
+    else {
+        // Map only (include map, characters, tileset)
+        applyToLayer = SceneManager._scene._spriteset._baseSprite;
+    }
+
+    const selectedLayer = applyToLayer;
+    const targetAngle = OD._transform.savedRotate;
+    const duration = parseInt(args.duration);
+    const easing = parseInt(args.easing);
+    const startAngle = selectedLayer.angle;
+
+    let frame = 0;
+
+    animateRotate = function() {
+        frame++;
+        let newAngle = 0;
+        switch (easing) {
+            case 1:
+                newAngle = OD._transform.easeIn(frame, startAngle, targetAngle - startAngle, duration);
+                break;
+            case 2:
+                newAngle = OD._transform.easeOut(frame, startAngle, targetAngle - startAngle, duration);
+                break;
+            case 3:
+                newAngle = OD._transform.easeInOut(frame, startAngle, targetAngle - startAngle, duration);
+                break;
+            default:
+                newAngle = startAngle + (targetAngle - startAngle) * frame / duration;
+                break;
+        }
+
+        selectedLayer.angle = newAngle;
+        if (frame < duration) {
+            requestAnimationFrame(animateRotate);
+        } else {
+            selectedLayer.angle = targetAngle;
+        }
+    }
+
+    animateRotate();
 });
 
 PluginManager.registerCommand('ODUE_screenTransform', 'reset', args => {
