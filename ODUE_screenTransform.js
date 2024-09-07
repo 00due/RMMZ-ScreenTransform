@@ -1,7 +1,7 @@
 
 
 /*:
- * @plugindesc (Ver 1.3) Transform the screen with a variety of animations.
+ * @plugindesc (Ver 1.4) Transform the screen with a variety of animations.
  * @author ODUE
  * @url https://github.com/00due/screenTransform-MZ
  * @target MZ MV
@@ -512,6 +512,9 @@
 var OD = OD || {};
 OD._transform = OD._transform || {};
 
+OD._transform.endShake = []
+OD._transform.savedScale = [1.0, 1.0];
+OD._transform.savedRotate = 0;
 
 OD._transform.easeIn = function(t, b, c, d) {
     return c*(t/=d)*t + b;
@@ -532,16 +535,63 @@ OD._transform.setPivot = function(layer, x, y) {
     layer.y = y;
 }
 
-OD._transform.endShake = []
+function getLayer(layer) {
+    switch (parseInt(layer)) {
+        case 1:
+            return SceneManager._scene;
+        case 2:
+            return SceneManager._scene._spriteset;
+        default:
+            return SceneManager._scene._spriteset._baseSprite;
+    }
+}
 
-OD._transform.savedScale = [1.0, 1.0];
-OD._transform.savedRotate = 0;
+function applyPivot(args, selectedLayer) {
+    const pivotX = parseInt(args.pivotX) === -1 ? Graphics.width / 2 : parseInt(args.pivotX);
+    const pivotY = parseInt(args.pivotY) === -1 ? Graphics.height / 2 : parseInt(args.pivotY);
+    if (args.setPivot === "true") {
+        OD._transform.setPivot(selectedLayer, pivotX, pivotY);
+    }
+}
 
-// Off for now
-/*Game_Interpreter.prototype.waitForTransform = function() {
-    this.wait(1);
-    this._index--;
-}*/
+getNewvalue = function(easingType, frame, startValue, targetValue, duration) {
+    switch (easingType) {
+        case 1:
+            return OD._transform.easeIn(frame, startValue, targetValue - startValue, duration);
+        case 2:
+            return OD._transform.easeOut(frame, startValue, targetValue - startValue, duration);
+        case 3:
+            return OD._transform.easeInOut(frame, startValue, targetValue - startValue, duration);
+        default:
+            return startValue + (targetValue - startValue) * frame / duration;
+    }
+}
+
+function animate(transformFunc, startValue, targetValue, duration, easingType) {
+    let frame = 0;
+    const runFrames = 1000 / 60;
+    let startTime = Date.now();
+
+    function step() {
+        const currentTime = Date.now();
+        const elapsed = currentTime - startTime;
+
+        if (elapsed > runFrames) {
+            startTime = currentTime - (elapsed % runFrames);
+            frame++;
+            const newValue = getNewvalue(easingType, frame, startValue, targetValue, duration);
+            transformFunc(newValue);
+        }
+
+        if (frame < duration) {
+            requestAnimationFrame(step);
+        } else {
+            transformFunc(targetValue);
+        }
+    }
+
+    step();
+}
 
 // Disable updating screen scale because of plugin scale command on SceneManager._scene._spriteset
 const useScaling = PluginManager.parameters('ODUE_screenTransform')['useScaling'] === 'true';
@@ -559,263 +609,98 @@ Spriteset_Base.prototype.updatePosition = function() {
 };
 
 PluginManager.registerCommand('ODUE_screenTransform', 'scale', args => {
-    let applyToLayer;
-    if (parseInt(args.layer) === 1) {
-        // Fullscreen
-        applyToLayer = SceneManager._scene;
-    }
-    else if (parseInt(args.layer) === 2) {
-        // Fullscreen without HUD
-        applyToLayer = SceneManager._scene._spriteset;
-    }
-    else {
-        // Map only (include map, characters, tileset)
-        applyToLayer = SceneManager._scene._spriteset._baseSprite;
-    }
-    const selectedLayer = applyToLayer;
+    const selectedLayer = getLayer(args.layer);
     const targetX = parseFloat(args.x);
     const targetY = parseFloat(args.y);
     const duration = parseInt(args.duration);
     const easing = parseInt(args.easing);
-   
-    const startScaleX = selectedLayer.scale.x;
-    const startScaleY = selectedLayer.scale.y;
-    const pivotX = parseInt(args.pivotX) === -1 ? Graphics.width / 2 : parseInt(args.pivotX);
-    const pivotY = parseInt(args.pivotY) === -1 ? Graphics.height / 2 : parseInt(args.pivotY);
-   
-    if (args.setPivot == "true") {
-        OD._transform.setPivot(selectedLayer, pivotX, pivotY);
-    }
 
-    let frame = 0;
+    applyPivot(args, selectedLayer);
 
-    animateScale = function() {
-        frame++;
-        let newScaleX = 0;
-        let newScaleY = 0;
-        switch (easing) {
-            case 1:
-                newScaleX = OD._transform.easeIn(frame, startScaleX, targetX - startScaleX, duration);
-                newScaleY = OD._transform.easeIn(frame, startScaleY, targetY - startScaleY, duration);
-                break;
-            case 2:
-                newScaleX = OD._transform.easeOut(frame, startScaleX, targetX - startScaleX, duration);
-                newScaleY = OD._transform.easeOut(frame, startScaleY, targetY - startScaleY, duration);
-                break;
-            case 3:
-                newScaleX = OD._transform.easeInOut(frame, startScaleX, targetX - startScaleX, duration);
-                newScaleY = OD._transform.easeInOut(frame, startScaleY, targetY - startScaleY, duration);
-                break;
-            default:
-                newScaleX = startScaleX + (targetX - startScaleX) * frame / duration;
-                newScaleY = startScaleY + (targetY - startScaleY) * frame / duration;
-                break;
-        }
+    animate(
+        newX => selectedLayer.scale.x = newX, 
+        selectedLayer.scale.x,
+        targetX,
+        duration,
+        easing
+    );
 
-        selectedLayer.scale.x = newScaleX;
-        selectedLayer.scale.y = newScaleY;
-        if (frame < duration) {
-            requestAnimationFrame(animateScale);
-            
-        } else {
-            selectedLayer.scale.x = targetX;
-            selectedLayer.scale.y = targetY;
-        }
-        
-    }
-
-    animateScale();
+    animate(
+        newY => selectedLayer.scale.y = newY, 
+        selectedLayer.scale.y,
+        targetY,
+        duration,
+        easing
+    );
 });
 
 PluginManager.registerCommand('ODUE_screenTransform', 'rotate', args => {
-    let applyToLayer;
-    if (parseInt(args.layer) === 1) {
-        // Fullscreen
-        applyToLayer = SceneManager._scene;
-    }
-    else if (parseInt(args.layer) === 2) {
-        // Fullscreen without HUD
-        applyToLayer = SceneManager._scene._spriteset;
-    }
-    else {
-        // Map only (include map, characters, tileset)
-        applyToLayer = SceneManager._scene._spriteset._baseSprite;
-    }
-    const selectedLayer = applyToLayer;
+    const selectedLayer = getLayer(args.layer);
     const targetAngle = parseFloat(args.angle);
     const duration = parseInt(args.duration);
     const easing = parseInt(args.easing);
-    const startAngle = selectedLayer.angle;
-    const pivotX = parseInt(args.pivotX) === -1 ? Graphics.width / 2 : parseInt(args.pivotX);
-    const pivotY = parseInt(args.pivotY) === -1 ? Graphics.height / 2 : parseInt(args.pivotY);
 
-    if (args.setPivot == "true") {
-        OD._transform.setPivot(selectedLayer, pivotX, pivotY);
-    }
+    applyPivot(args, selectedLayer);
 
-    let frame = 0;
-
-    animateRotate = function() {
-        frame++;
-        let newAngle = 0;
-        switch (easing) {
-            case 1:
-                newAngle = OD._transform.easeIn(frame, startAngle, targetAngle - startAngle, duration);
-                break;
-            case 2:
-                newAngle = OD._transform.easeOut(frame, startAngle, targetAngle - startAngle, duration);
-                break;
-            case 3:
-                newAngle = OD._transform.easeInOut(frame, startAngle, targetAngle - startAngle, duration);
-                break;
-            default:
-                newAngle = startAngle + (targetAngle - startAngle) * frame / duration;
-                break;
-        }
-
-        selectedLayer.angle = newAngle;
-        if (frame < duration) {
-            requestAnimationFrame(animateRotate);
-            
-        } else {
-            selectedLayer.angle = targetAngle;
-        }
-        
-    }
-
-    animateRotate();
+    animate(
+        newAngle => selectedLayer.angle = newAngle, 
+        selectedLayer.angle,
+        targetAngle,
+        duration,
+        easing
+    );
 });
 
 PluginManager.registerCommand('ODUE_screenTransform', 'move', args => {
-    let applyToLayer;
-    if (parseInt(args.layer) === 1) {
-        // Fullscreen
-        applyToLayer = SceneManager._scene;
-    }
-    else if (parseInt(args.layer) === 2) {
-        // Fullscreen without HUD
-        applyToLayer = SceneManager._scene._spriteset;
-    }
-    else {
-        // Map only (include map, characters, tileset)
-        applyToLayer = SceneManager._scene._spriteset._baseSprite;
-    }
-    const selectedLayer = applyToLayer;
-    const targetX = parseInt(args.x);
-    const targetY = parseInt(args.y);
+    const selectedLayer = getLayer(args.layer);
+    const targetX = parseFloat(args.x);
+    const targetY = parseFloat(args.y);
     const duration = parseInt(args.duration);
     const easing = parseInt(args.easing);
-    const startX = selectedLayer.x;
-    const startY = selectedLayer.y;
-    const pivotX = parseInt(args.pivotX) === -1 ? Graphics.width / 2 : parseInt(args.pivotX);
-    const pivotY = parseInt(args.pivotY) === -1 ? Graphics.height / 2 : parseInt(args.pivotY);
-    
-    if (args.setPivot == "true") {
-        OD._transform.setPivot(selectedLayer, pivotX, pivotY);
-    }
 
-    let frame = 0;
+    applyPivot(args, selectedLayer);
 
-    animateMove = function() {
-        frame++;
-        let newX = 0;
-        let newY = 0;
-        switch (easing) {
-            case 1:
-                newX = OD._transform.easeIn(frame, startX, targetX - startX, duration);
-                newY = OD._transform.easeIn(frame, startY, targetY - startY, duration);
-                break;
-            case 2:
-                newX = OD._transform.easeOut(frame, startX, targetX - startX, duration);
-                newY = OD._transform.easeOut(frame, startY, targetY - startY, duration);
-                break;
-            case 3:
-                newX = OD._transform.easeInOut(frame, startX, targetX - startX, duration);
-                newY = OD._transform.easeInOut(frame, startY, targetY - startY, duration);
-                break;
-            default:
-                newX = startX + (targetX - startX) * frame / duration;
-                newY = startY + (targetY - startY) * frame / duration;
-                break;
-        }
+    animate(
+        newX => selectedLayer.x = newX,
+        selectedLayer.x,
+        targetX,
+        duration,
+        easing
+    );
 
-        selectedLayer.x = newX;
-        selectedLayer.y = newY;
-        if (frame < duration) {
-            requestAnimationFrame(animateMove);
-            
-        } else {
-            selectedLayer.x = targetX;
-            selectedLayer.y = targetY;
-        }
-    }
-    animateMove();
+    animate(
+        newY => selectedLayer.y = newY,
+        selectedLayer.y,
+        targetY,
+        duration,
+        easing
+    );
 });
 
 PluginManager.registerCommand('ODUE_screenTransform', 'skew', args => {
-    let applyToLayer;
-    if (parseInt(args.layer) === 1) {
-        // Fullscreen
-        applyToLayer = SceneManager._scene;
-    }
-    else if (parseInt(args.layer) === 2) {
-        // Fullscreen without HUD
-        applyToLayer = SceneManager._scene._spriteset;
-    }
-    else {
-        // Map only (include map, characters, tileset)
-        applyToLayer = SceneManager._scene._spriteset._baseSprite;
-    }
-    const selectedLayer = applyToLayer;
-    const targetX = parseFloat(args.x) / 100;
-    const targetY = parseFloat(args.y) / 100;
+    const selectedLayer = getLayer(args.layer);
+    const targetX = parseFloat(args.x);
+    const targetY = parseFloat(args.y);
     const duration = parseInt(args.duration);
     const easing = parseInt(args.easing);
-    const startX = selectedLayer.skew.x;
-    const startY = selectedLayer.skew.y;
-    const pivotX = parseInt(args.pivotX) === -1 ? Graphics.width / 2 : parseInt(args.pivotX);
-    const pivotY = parseInt(args.pivotY) === -1 ? Graphics.height / 2 : parseInt(args.pivotY);
-    
-    if (args.setPivot == "true") {
-        OD._transform.setPivot(selectedLayer, pivotX, pivotY);
-    }
 
-    let frame = 0;
+    applyPivot(args, selectedLayer);
 
-    animateSkew = function() {
-        frame++;
-        let newX = 0;
-        let newY = 0;
-        switch (easing) {
-            case 1:
-                newX = OD._transform.easeIn(frame, startX, targetX - startX, duration);
-                newY = OD._transform.easeIn(frame, startY, targetY - startY, duration);
-                break;
-            case 2:
-                newX = OD._transform.easeOut(frame, startX, targetX - startX, duration);
-                newY = OD._transform.easeOut(frame, startY, targetY - startY, duration);
-                break;
-            case 3:
-                newX = OD._transform.easeInOut(frame, startX, targetX - startX, duration);
-                newY = OD._transform.easeInOut(frame, startY, targetY - startY, duration);
-                break;
-            default:
-                newX = startX + (targetX - startX) * frame / duration;
-                newY = startY + (targetY - startY) * frame / duration;
-                break;
-        }
+    animate(
+        newX => selectedLayer.skew.x = newX,
+        selectedLayer.skew.x,
+        targetX,
+        duration,
+        easing
+    );
 
-        selectedLayer.skew.x = newX;
-        selectedLayer.skew.y = newY;
-        if (frame < duration) {
-            requestAnimationFrame(animateSkew);
-            
-        } else {
-            selectedLayer.skew.x = targetX;
-            selectedLayer.skew.y = targetY;
-        }
-    }
-    animateSkew();
+    animate(
+        newY => selectedLayer.skew.y = newY,
+        selectedLayer.skew.y,
+        targetY,
+        duration,
+        easing
+    );
 });
 
 PluginManager.registerCommand('ODUE_screenTransform', 'cshk2', args => {
@@ -841,6 +726,9 @@ PluginManager.registerCommand('ODUE_screenTransform', 'cshk2', args => {
     const shakeMagnitude = parseInt(args.magnitude);
     const shakeSpeed = parseInt(args.speed) / 10;
     const start = Date.now();
+
+    const layerOriginalPosition = [selectedLayer.x, selectedLayer.y];
+
     let frame = 0;
     let endDuration = parseInt(args.endDuration);
     let currentEndDuration = 0;
@@ -857,8 +745,8 @@ PluginManager.registerCommand('ODUE_screenTransform', 'cshk2', args => {
         //Fixme: Temporary fix when transfering map. I coulnd't get it to work
         //any other way than this.
         try {
-            selectedLayer.x = x;
-            selectedLayer.y = y;
+            selectedLayer.x = layerOriginalPosition[0] + x;
+            selectedLayer.y = layerOriginalPosition[1] + y;
         }
         catch (e) {}
         
@@ -873,24 +761,22 @@ PluginManager.registerCommand('ODUE_screenTransform', 'cshk2', args => {
                 OD._transform.endShake = [];
             }
             requestAnimationFrame(() => endShake(t));
-            /* selectedLayer.x = 0;
-            selectedLayer.y = 0; */
         }
     }
     animateShake();
 
     endShake = function(t) {
         if (currentEndDuration < endDuration) {
-            selectedLayer.x = Math.sin(t * 1.2) * shakeMagnitude * (endDuration + 1 - currentEndDuration) / endDuration;
-            selectedLayer.y = Math.sin(t) * shakeMagnitude * (endDuration - currentEndDuration) / endDuration;
+            selectedLayer.x = layerOriginalPosition[0] + Math.sin(t * 1.2) * shakeMagnitude * (endDuration + 1 - currentEndDuration) / endDuration;
+            selectedLayer.y = layerOriginalPosition[1] + Math.sin(t) * shakeMagnitude * (endDuration - currentEndDuration) / endDuration;
             currentEndDuration++;
             const elapsed = (Date.now() - start) * 0.001;
             t = elapsed * shakeSpeed; // time factor
             requestAnimationFrame(() => endShake(t));
         }
         else {
-            selectedLayer.x = 0;
-            selectedLayer.y = 0;
+            selectedLayer.x = layerOriginalPosition[0];
+            selectedLayer.y = layerOriginalPosition[1];
         }
     }
 });
@@ -919,170 +805,60 @@ PluginManager.registerCommand('ODUE_screenTransform', 'endShake', args => {
 });
 
 PluginManager.registerCommand('ODUE_screenTransform', 'saveScale', args => {
-    let applyToLayer;
-    if (parseInt(args.layer) === 1) {
-        // Fullscreen
-        applyToLayer = SceneManager._scene;
-    }
-    else if (parseInt(args.layer) === 2) {
-        // Fullscreen without HUD
-        applyToLayer = SceneManager._scene._spriteset;
-    }
-    else {
-        // Map only (include map, characters, tileset)
-        applyToLayer = SceneManager._scene._spriteset._baseSprite;
-    }
-    OD._transform.savedScale = [applyToLayer.scale.x, applyToLayer.scale.y];
+    const selectedLayer = getLayer(args.layer);
+    OD._transform.savedScale = [selectedLayer.scale.x, selectedLayer.scale.y];
 });
 
 PluginManager.registerCommand('ODUE_screenTransform', 'saveRotation', args => {
-    let applyToLayer;
-    if (parseInt(args.layer) === 1) {
-        // Fullscreen
-        applyToLayer = SceneManager._scene;
-    }
-    else if (parseInt(args.layer) === 2) {
-        // Fullscreen without HUD
-        applyToLayer = SceneManager._scene._spriteset;
-    }
-    else {
-        // Map only (include map, characters, tileset)
-        applyToLayer = SceneManager._scene._spriteset._baseSprite;
-    }
-    OD._transform.savedRotate = applyToLayer.angle;
+    const selectedLayer = getLayer(args.layer);
+    OD._transform.savedRotate = selectedLayer.angle;
 });
 
 PluginManager.registerCommand('ODUE_screenTransform', 'restoreScale', args => {
-    let applyToLayer;
-    if (parseInt(args.layer) === 1) {
-        // Fullscreen
-        applyToLayer = SceneManager._scene;
-    }
-    else if (parseInt(args.layer) === 2) {
-        // Fullscreen without HUD
-        applyToLayer = SceneManager._scene._spriteset;
-    }
-    else {
-        // Map only (include map, characters, tileset)
-        applyToLayer = SceneManager._scene._spriteset._baseSprite;
-    }
-
-    const selectedLayer = applyToLayer;
+    const selectedLayer = getLayer(args.layer);
     const targetX = OD._transform.savedScale[0];
     const targetY = OD._transform.savedScale[1];
     const duration = parseInt(args.duration);
     const easing = parseInt(args.easing);
-   
-    const startScaleX = selectedLayer.scale.x;
-    const startScaleY = selectedLayer.scale.y;
 
-    let frame = 0;
+    applyPivot(args, selectedLayer);
 
-    animateScale = function() {
-        frame++;
-        let newScaleX = 0;
-        let newScaleY = 0;
-        switch (easing) {
-            case 1:
-                newScaleX = OD._transform.easeIn(frame, startScaleX, targetX - startScaleX, duration);
-                newScaleY = OD._transform.easeIn(frame, startScaleY, targetY - startScaleY, duration);
-                break;
-            case 2:
-                newScaleX = OD._transform.easeOut(frame, startScaleX, targetX - startScaleX, duration);
-                newScaleY = OD._transform.easeOut(frame, startScaleY, targetY - startScaleY, duration);
-                break;
-            case 3:
-                newScaleX = OD._transform.easeInOut(frame, startScaleX, targetX - startScaleX, duration);
-                newScaleY = OD._transform.easeInOut(frame, startScaleY, targetY - startScaleY, duration);
-                break;
-            default:
-                newScaleX = startScaleX + (targetX - startScaleX) * frame / duration;
-                newScaleY = startScaleY + (targetY - startScaleY) * frame / duration;
-                break;
-        }
+    animate(
+        newX => selectedLayer.scale.x = newX, 
+        selectedLayer.scale.x,
+        targetX,
+        duration,
+        easing
+    );
 
-        selectedLayer.scale.x = newScaleX;
-        selectedLayer.scale.y = newScaleY;
-        if (frame < duration) {
-            requestAnimationFrame(animateScale);
-            
-        } else {
-            selectedLayer.scale.x = targetX;
-            selectedLayer.scale.y = targetY;
-        }
-        
-    }
-
-    animateScale();
+    animate(
+        newY => selectedLayer.scale.y = newY, 
+        selectedLayer.scale.y,
+        targetY,
+        duration,
+        easing
+    );
 });
 
 PluginManager.registerCommand('ODUE_screenTransform', 'restoreRotation', args => {
-    let applyToLayer;
-    if (parseInt(args.layer) === 1) {
-        // Fullscreen
-        applyToLayer = SceneManager._scene;
-    }
-    else if (parseInt(args.layer) === 2) {
-        // Fullscreen without HUD
-        applyToLayer = SceneManager._scene._spriteset;
-    }
-    else {
-        // Map only (include map, characters, tileset)
-        applyToLayer = SceneManager._scene._spriteset._baseSprite;
-    }
-
-    const selectedLayer = applyToLayer;
+    const selectedLayer = getLayer(args.layer);
     const targetAngle = OD._transform.savedRotate;
     const duration = parseInt(args.duration);
     const easing = parseInt(args.easing);
-    const startAngle = selectedLayer.angle;
 
-    let frame = 0;
+    applyPivot(args, selectedLayer);
 
-    animateRotate = function() {
-        frame++;
-        let newAngle = 0;
-        switch (easing) {
-            case 1:
-                newAngle = OD._transform.easeIn(frame, startAngle, targetAngle - startAngle, duration);
-                break;
-            case 2:
-                newAngle = OD._transform.easeOut(frame, startAngle, targetAngle - startAngle, duration);
-                break;
-            case 3:
-                newAngle = OD._transform.easeInOut(frame, startAngle, targetAngle - startAngle, duration);
-                break;
-            default:
-                newAngle = startAngle + (targetAngle - startAngle) * frame / duration;
-                break;
-        }
-
-        selectedLayer.angle = newAngle;
-        if (frame < duration) {
-            requestAnimationFrame(animateRotate);
-        } else {
-            selectedLayer.angle = targetAngle;
-        }
-    }
-
-    animateRotate();
+    animate(
+        newAngle => selectedLayer.angle = newAngle, 
+        selectedLayer.angle,
+        targetAngle,
+        duration,
+        easing
+    );
 });
 
 PluginManager.registerCommand('ODUE_screenTransform', 'reset', args => {
-    let applyToLayer;
-    if (parseInt(args.layer) === 1) {
-        // Fullscreen
-        applyToLayer = SceneManager._scene;
-    }
-    else if (parseInt(args.layer) === 2) {
-        // Fullscreen without HUD
-        applyToLayer = SceneManager._scene._spriteset;
-    }
-    else {
-        // Map only (include map, characters, tileset)
-        applyToLayer = SceneManager._scene._spriteset._baseSprite;
-    }
-    const selectedLayer = applyToLayer;
+    const selectedLayer = getLayer(args.layer);
     selectedLayer.scale.x = 1;
     selectedLayer.scale.y = 1;
     selectedLayer.angle = 0;
