@@ -1,7 +1,7 @@
 
 
 /*:
- * @plugindesc (Ver 1.4) Transform the screen with a variety of animations.
+ * @plugindesc (Ver 1.5) Transform the screen with a variety of animations.
  * @author ODUE
  * @url https://github.com/00due/screenTransform-MZ
  * @target MZ MV
@@ -554,7 +554,24 @@ function applyPivot(args, selectedLayer) {
     }
 }
 
-getNewvalue = function(easingType, frame, startValue, targetValue, duration) {
+let animationState = {
+    scaleX: null,
+    scaleY: null,
+    rotate: null,
+    skewX: null,
+    skewY: null,
+    moveX: null,
+    moveY: null
+};
+
+function cancelAnimation(type) {
+    if (animationState[type]) {
+        cancelAnimationFrame(animationState[type]); // Properly cancel the frame
+        animationState[type] = null;
+    }
+}
+
+function getNewValue(easingType, frame, startValue, targetValue, duration) {
     switch (easingType) {
         case 1:
             return OD._transform.easeIn(frame, startValue, targetValue - startValue, duration);
@@ -567,10 +584,12 @@ getNewvalue = function(easingType, frame, startValue, targetValue, duration) {
     }
 }
 
-function animate(transformFunc, startValue, targetValue, duration, easingType) {
+function animate(transformFunc, startValue, targetValue, duration, easingType, animeType) {
     let frame = 0;
     const runFrames = 1000 / 60;
     let startTime = Date.now();
+
+    cancelAnimation(animeType)
 
     function step() {
         const currentTime = Date.now();
@@ -579,18 +598,19 @@ function animate(transformFunc, startValue, targetValue, duration, easingType) {
         if (elapsed > runFrames) {
             startTime = currentTime - (elapsed % runFrames);
             frame++;
-            const newValue = getNewvalue(easingType, frame, startValue, targetValue, duration);
+            const newValue = getNewValue(easingType, frame, startValue, targetValue, duration);
             transformFunc(newValue);
         }
 
         if (frame < duration) {
-            requestAnimationFrame(step);
+            animationState[animeType] = requestAnimationFrame(step);
         } else {
             transformFunc(targetValue);
+            animationState[animeType] = null;
         }
     }
 
-    step();
+    animationState[animeType] = requestAnimationFrame(step);
 }
 
 // Disable updating screen scale because of plugin scale command on SceneManager._scene._spriteset
@@ -622,7 +642,8 @@ PluginManager.registerCommand('ODUE_screenTransform', 'scale', args => {
         selectedLayer.scale.x,
         targetX,
         duration,
-        easing
+        easing,
+        'scaleX'
     );
 
     animate(
@@ -630,7 +651,8 @@ PluginManager.registerCommand('ODUE_screenTransform', 'scale', args => {
         selectedLayer.scale.y,
         targetY,
         duration,
-        easing
+        easing,
+        'scaleY'
     );
 });
 
@@ -647,7 +669,8 @@ PluginManager.registerCommand('ODUE_screenTransform', 'rotate', args => {
         selectedLayer.angle,
         targetAngle,
         duration,
-        easing
+        easing,
+        'rotate'
     );
 });
 
@@ -665,7 +688,8 @@ PluginManager.registerCommand('ODUE_screenTransform', 'move', args => {
         selectedLayer.x,
         targetX,
         duration,
-        easing
+        easing,
+        'moveX'
     );
 
     animate(
@@ -673,7 +697,8 @@ PluginManager.registerCommand('ODUE_screenTransform', 'move', args => {
         selectedLayer.y,
         targetY,
         duration,
-        easing
+        easing,
+        'moveY'
     );
 });
 
@@ -691,7 +716,8 @@ PluginManager.registerCommand('ODUE_screenTransform', 'skew', args => {
         selectedLayer.skew.x,
         targetX,
         duration,
-        easing
+        easing,
+        'skewX'
     );
 
     animate(
@@ -699,7 +725,8 @@ PluginManager.registerCommand('ODUE_screenTransform', 'skew', args => {
         selectedLayer.skew.y,
         targetY,
         duration,
-        easing
+        easing,
+        'skewY'
     );
 });
 
@@ -828,7 +855,8 @@ PluginManager.registerCommand('ODUE_screenTransform', 'restoreScale', args => {
         selectedLayer.scale.x,
         targetX,
         duration,
-        easing
+        easing,
+        'scaleX'
     );
 
     animate(
@@ -836,7 +864,8 @@ PluginManager.registerCommand('ODUE_screenTransform', 'restoreScale', args => {
         selectedLayer.scale.y,
         targetY,
         duration,
-        easing
+        easing,
+        'scaleY'
     );
 });
 
@@ -853,7 +882,8 @@ PluginManager.registerCommand('ODUE_screenTransform', 'restoreRotation', args =>
         selectedLayer.angle,
         targetAngle,
         duration,
-        easing
+        easing,
+        'rotate'
     );
 });
 
