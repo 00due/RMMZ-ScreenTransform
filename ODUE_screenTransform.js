@@ -1,7 +1,7 @@
 
 
 /*:
- * @plugindesc (Ver 1.5) Transform the screen with a variety of animations.
+ * @plugindesc (Ver 1.6) Transform the screen with a variety of animations.
  * @author ODUE
  * @url https://github.com/00due/screenTransform-MZ
  * @target MZ MV
@@ -608,7 +608,8 @@ function animate(transformFunc, startValue, targetValue, duration, easingType, a
         if (frame < duration) {
             animationState[animeType] = requestAnimationFrame(step);
         } else {
-            transformFunc(targetValue);
+            try { transformFunc(targetValue); }
+            catch (e) {}
             animationState[animeType] = null;
         }
     }
@@ -797,16 +798,21 @@ PluginManager.registerCommand('ODUE_screenTransform', 'cshk2', args => {
 
     endShake = function(t) {
         if (currentEndDuration < endDuration) {
-            selectedLayer.x = layerOriginalPosition[0] + Math.sin(t * 1.2) * shakeMagnitude * (endDuration + 1 - currentEndDuration) / endDuration;
-            selectedLayer.y = layerOriginalPosition[1] + Math.sin(t) * shakeMagnitude * (endDuration - currentEndDuration) / endDuration;
+            try {
+                selectedLayer.x = layerOriginalPosition[0] + Math.sin(t * 1.2) * shakeMagnitude * (endDuration + 1 - currentEndDuration) / endDuration;
+                selectedLayer.y = layerOriginalPosition[1] + Math.sin(t) * shakeMagnitude * (endDuration - currentEndDuration) / endDuration;
+            } catch (e) {}
             currentEndDuration++;
             const elapsed = (Date.now() - start) * 0.001;
             t = elapsed * shakeSpeed; // time factor
             requestAnimationFrame(() => endShake(t));
         }
         else {
-            selectedLayer.x = layerOriginalPosition[0];
-            selectedLayer.y = layerOriginalPosition[1];
+            try {
+                selectedLayer.x = layerOriginalPosition[0];
+                selectedLayer.y = layerOriginalPosition[1];
+            }
+            catch (e) {}
         }
     }
 });
