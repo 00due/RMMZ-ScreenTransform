@@ -598,8 +598,11 @@ function animate(transformFunc, startValue, targetValue, duration, easingType, a
         if (elapsed > runFrames) {
             startTime = currentTime - (elapsed % runFrames);
             frame++;
-            const newValue = getNewValue(easingType, frame, startValue, targetValue, duration);
-            transformFunc(newValue);
+            try {
+                const newValue = getNewValue(easingType, frame, startValue, targetValue, duration);
+                transformFunc(newValue);
+            }
+            catch (e) {}
         }
 
         if (frame < duration) {
