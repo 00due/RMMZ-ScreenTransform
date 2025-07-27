@@ -1,7 +1,7 @@
 
 
 /*:
- * @plugindesc (Ver 1.6) Transform the screen with a variety of animations.
+ * @plugindesc (Ver 1.7) Transform the screen with a variety of animations.
  * @author ODUE
  * @url https://github.com/00due/screenTransform-MZ
  * @target MZ MV
@@ -516,6 +516,8 @@ OD._transform.endShake = []
 OD._transform.savedScale = [1.0, 1.0];
 OD._transform.savedRotate = 0;
 
+
+
 OD._transform.easeIn = function(t, b, c, d) {
     return c*(t/=d)*t + b;
 }
@@ -557,6 +559,7 @@ function applyPivot(args, selectedLayer) {
 let animationState = {
     scaleX: null,
     scaleY: null,
+    scaleXY: null,
     rotate: null,
     skewX: null,
     skewY: null,
@@ -564,10 +567,29 @@ let animationState = {
     moveY: null
 };
 
+OD._transform.isTransformingList = {
+    scaleX: false,
+    scaleY: false,
+    scaleXY: false,
+    rotate: false,
+    skewX: false,
+    skewY: false,
+    moveX: false,
+    moveY: false
+};
+
+OD._transform.amountOfSimultaneousTransformations = 0;
+
+OD._transform.isCurrentlyAnyTransforming = function() {
+    return this.amountOfSimultaneousTransformations > 0;
+}
+
 function cancelAnimation(type) {
     if (animationState[type]) {
+        OD._transform.amountOfSimultaneousTransformations--;
         cancelAnimationFrame(animationState[type]); // Properly cancel the frame
         animationState[type] = null;
+        OD._transform.isTransformingList[type] = false;
     }
 }
 
@@ -588,7 +610,8 @@ function animate(transformFunc, startValue, targetValue, duration, easingType, a
     let frame = 0;
     const runFrames = 1000 / 60;
     let startTime = Date.now();
-
+    OD._transform.isTransformingList[animeType] = true;
+    OD._transform.amountOfSimultaneousTransformations++;
     cancelAnimation(animeType)
 
     function step() {
@@ -598,19 +621,19 @@ function animate(transformFunc, startValue, targetValue, duration, easingType, a
         if (elapsed > runFrames) {
             startTime = currentTime - (elapsed % runFrames);
             frame++;
-            try {
-                const newValue = getNewValue(easingType, frame, startValue, targetValue, duration);
-                transformFunc(newValue);
-            }
+            const newValue = getNewValue(easingType, frame, startValue, targetValue, duration);
+            try { transformFunc(targetValue); }
             catch (e) {}
         }
 
         if (frame < duration) {
             animationState[animeType] = requestAnimationFrame(step);
         } else {
+            OD._transform.amountOfSimultaneousTransformations--;
             try { transformFunc(targetValue); }
             catch (e) {}
             animationState[animeType] = null;
+            OD._transform.isTransformingList[animeType] = false;
         }
     }
 
@@ -641,23 +664,35 @@ PluginManager.registerCommand('ODUE_screenTransform', 'scale', args => {
 
     applyPivot(args, selectedLayer);
 
-    animate(
-        newX => selectedLayer.scale.x = newX, 
-        selectedLayer.scale.x,
-        targetX,
-        duration,
-        easing,
-        'scaleX'
-    );
+    if (targetX === targetY) {
+        animate(
+            newScale => selectedLayer.scale.x = selectedLayer.scale.y = newScale,
+            selectedLayer.scale.x,
+            targetX,
+            duration,
+            easing,
+            'scaleXY'
+        );
+    } else {
 
-    animate(
-        newY => selectedLayer.scale.y = newY, 
-        selectedLayer.scale.y,
-        targetY,
-        duration,
-        easing,
-        'scaleY'
-    );
+        animate(
+            newX => selectedLayer.scale.x = newX, 
+            selectedLayer.scale.x,
+            targetX,
+            duration,
+            easing,
+            'scaleX'
+        );
+
+        animate(
+            newY => selectedLayer.scale.y = newY, 
+            selectedLayer.scale.y,
+            targetY,
+            duration,
+            easing,
+            'scaleY'
+        );
+    }
 });
 
 PluginManager.registerCommand('ODUE_screenTransform', 'rotate', args => {
@@ -753,7 +788,7 @@ PluginManager.registerCommand('ODUE_screenTransform', 'cshk2', args => {
         applyToLayer = SceneManager._scene._spriteset._tilemap;
     }
     const selectedLayer = applyToLayer;
-    const duration = parseInt(args.duration);
+    let duration = parseInt(args.duration);
     const shakeMagnitude = parseInt(args.magnitude);
     const shakeSpeed = parseInt(args.speed) / 10;
     const start = Date.now();
@@ -789,6 +824,7 @@ PluginManager.registerCommand('ODUE_screenTransform', 'cshk2', args => {
         } else {
             if (OD._transform.endShake[1] > 0) {
                 endDuration = OD._transform.endShake[1];
+                duration = 1;
                 OD._transform.endShake = [];
             }
             requestAnimationFrame(() => endShake(t));
@@ -842,12 +878,15 @@ PluginManager.registerCommand('ODUE_screenTransform', 'endShake', args => {
 
 PluginManager.registerCommand('ODUE_screenTransform', 'saveScale', args => {
     const selectedLayer = getLayer(args.layer);
-    OD._transform.savedScale = [selectedLayer.scale.x, selectedLayer.scale.y];
+    if (!OD._transform.isTransformingList.scaleX && !OD._transform.isTransformingList.scaleY
+        && !OD._transform.isTransformingList.scaleXY)
+        OD._transform.savedScale = [selectedLayer.scale.x, selectedLayer.scale.y];
 });
 
 PluginManager.registerCommand('ODUE_screenTransform', 'saveRotation', args => {
     const selectedLayer = getLayer(args.layer);
-    OD._transform.savedRotate = selectedLayer.angle;
+    if (!OD._transform.isTransformingList.rotate)
+        OD._transform.savedRotate = selectedLayer.angle;
 });
 
 PluginManager.registerCommand('ODUE_screenTransform', 'restoreScale', args => {
