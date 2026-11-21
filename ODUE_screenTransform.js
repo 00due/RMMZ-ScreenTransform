@@ -622,7 +622,7 @@ function animate(transformFunc, startValue, targetValue, duration, easingType, a
             startTime = currentTime - (elapsed % runFrames);
             frame++;
             const newValue = getNewValue(easingType, frame, startValue, targetValue, duration);
-            try { transformFunc(targetValue); }
+            try { transformFunc(newValue); }
             catch (e) {}
         }
 
