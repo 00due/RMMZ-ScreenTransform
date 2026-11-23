@@ -1,7 +1,7 @@
 
 
 /*:
- * @plugindesc (Ver 1.7) Transform the screen with a variety of animations.
+ * @plugindesc (Ver 1.8) Transform the screen with a variety of animations.
  * @author ODUE
  * @url https://github.com/00due/screenTransform-MZ
  * @target MZ MV
@@ -515,6 +515,11 @@ OD._transform = OD._transform || {};
 OD._transform.endShake = []
 OD._transform.savedScale = [1.0, 1.0];
 OD._transform.savedRotate = 0;
+OD._transform.persistentLayers = [
+    { scaleX: 1, scaleY: 1, angle: 0, skewX: 0, skewY: 0, x: 0, y: 0, pivotX: 0, pivotY: 0 },
+    { scaleX: 1, scaleY: 1, angle: 0, skewX: 0, skewY: 0, x: 0, y: 0, pivotX: 0, pivotY: 0 },
+    { scaleX: 1, scaleY: 1, angle: 0, skewX: 0, skewY: 0, x: 0, y: 0, pivotX: 0, pivotY: 0 }
+];
 
 
 
@@ -548,11 +553,56 @@ function getLayer(layer) {
     }
 }
 
+function layerNumber(layer) {
+    const value = parseInt(layer);
+    return value === 1 || value === 2 ? value : 0;
+}
+
+function setPersistentProperty(layer, layerId, property, value) {
+    if (layer) {
+        layer[property] = value;
+    }
+    OD._transform.persistentLayers[layerId][property] = value;
+}
+
+function applyPersistentLayer(layer, state) {
+    if (!layer) {
+        return;
+    }
+    layer.pivot.set(state.pivotX, state.pivotY);
+    layer.scale.x = state.scaleX;
+    layer.scale.y = state.scaleY;
+    layer.angle = state.angle;
+    layer.skew.x = state.skewX;
+    layer.skew.y = state.skewY;
+    layer.x = state.x;
+    layer.y = state.y;
+}
+
+function applyPersistentTransforms(scene) {
+    applyPersistentLayer(scene, OD._transform.persistentLayers[1]);
+    if (scene && scene._spriteset) {
+        applyPersistentLayer(scene._spriteset, OD._transform.persistentLayers[2]);
+        applyPersistentLayer(scene._spriteset._baseSprite, OD._transform.persistentLayers[0]);
+    }
+}
+
+const _Scene_Base_update = Scene_Base.prototype.update;
+Scene_Base.prototype.update = function() {
+    _Scene_Base_update.call(this);
+    applyPersistentTransforms(this);
+};
+
 function applyPivot(args, selectedLayer) {
+    const layerId = layerNumber(args.layer);
     const pivotX = parseInt(args.pivotX) === -1 ? Graphics.width / 2 : parseInt(args.pivotX);
     const pivotY = parseInt(args.pivotY) === -1 ? Graphics.height / 2 : parseInt(args.pivotY);
     if (args.setPivot === "true") {
         OD._transform.setPivot(selectedLayer, pivotX, pivotY);
+        OD._transform.persistentLayers[layerId].pivotX = pivotX;
+        OD._transform.persistentLayers[layerId].pivotY = pivotY;
+        OD._transform.persistentLayers[layerId].x = pivotX;
+        OD._transform.persistentLayers[layerId].y = pivotY;
     }
 }
 
@@ -666,7 +716,10 @@ PluginManager.registerCommand('ODUE_screenTransform', 'scale', args => {
 
     if (targetX === targetY) {
         animate(
-            newScale => selectedLayer.scale.x = selectedLayer.scale.y = newScale,
+            newScale => {
+                setPersistentProperty(selectedLayer, layerNumber(args.layer), 'scaleX', newScale);
+                setPersistentProperty(selectedLayer, layerNumber(args.layer), 'scaleY', newScale);
+            },
             selectedLayer.scale.x,
             targetX,
             duration,
@@ -676,7 +729,7 @@ PluginManager.registerCommand('ODUE_screenTransform', 'scale', args => {
     } else {
 
         animate(
-            newX => selectedLayer.scale.x = newX, 
+            newX => setPersistentProperty(selectedLayer, layerNumber(args.layer), 'scaleX', newX),
             selectedLayer.scale.x,
             targetX,
             duration,
@@ -685,7 +738,7 @@ PluginManager.registerCommand('ODUE_screenTransform', 'scale', args => {
         );
 
         animate(
-            newY => selectedLayer.scale.y = newY, 
+            newY => setPersistentProperty(selectedLayer, layerNumber(args.layer), 'scaleY', newY),
             selectedLayer.scale.y,
             targetY,
             duration,
@@ -704,7 +757,7 @@ PluginManager.registerCommand('ODUE_screenTransform', 'rotate', args => {
     applyPivot(args, selectedLayer);
 
     animate(
-        newAngle => selectedLayer.angle = newAngle, 
+        newAngle => setPersistentProperty(selectedLayer, layerNumber(args.layer), 'angle', newAngle),
         selectedLayer.angle,
         targetAngle,
         duration,
@@ -723,7 +776,7 @@ PluginManager.registerCommand('ODUE_screenTransform', 'move', args => {
     applyPivot(args, selectedLayer);
 
     animate(
-        newX => selectedLayer.x = newX,
+        newX => setPersistentProperty(selectedLayer, layerNumber(args.layer), 'x', newX),
         selectedLayer.x,
         targetX,
         duration,
@@ -732,7 +785,7 @@ PluginManager.registerCommand('ODUE_screenTransform', 'move', args => {
     );
 
     animate(
-        newY => selectedLayer.y = newY,
+        newY => setPersistentProperty(selectedLayer, layerNumber(args.layer), 'y', newY),
         selectedLayer.y,
         targetY,
         duration,
@@ -751,7 +804,7 @@ PluginManager.registerCommand('ODUE_screenTransform', 'skew', args => {
     applyPivot(args, selectedLayer);
 
     animate(
-        newX => selectedLayer.skew.x = newX,
+        newX => setPersistentProperty(selectedLayer, layerNumber(args.layer), 'skewX', newX),
         selectedLayer.skew.x,
         targetX,
         duration,
@@ -760,7 +813,7 @@ PluginManager.registerCommand('ODUE_screenTransform', 'skew', args => {
     );
 
     animate(
-        newY => selectedLayer.skew.y = newY,
+        newY => setPersistentProperty(selectedLayer, layerNumber(args.layer), 'skewY', newY),
         selectedLayer.skew.y,
         targetY,
         duration,
@@ -899,7 +952,7 @@ PluginManager.registerCommand('ODUE_screenTransform', 'restoreScale', args => {
     applyPivot(args, selectedLayer);
 
     animate(
-        newX => selectedLayer.scale.x = newX, 
+        newX => setPersistentProperty(selectedLayer, layerNumber(args.layer), 'scaleX', newX),
         selectedLayer.scale.x,
         targetX,
         duration,
@@ -908,7 +961,7 @@ PluginManager.registerCommand('ODUE_screenTransform', 'restoreScale', args => {
     );
 
     animate(
-        newY => selectedLayer.scale.y = newY, 
+        newY => setPersistentProperty(selectedLayer, layerNumber(args.layer), 'scaleY', newY),
         selectedLayer.scale.y,
         targetY,
         duration,
@@ -926,7 +979,7 @@ PluginManager.registerCommand('ODUE_screenTransform', 'restoreRotation', args =>
     applyPivot(args, selectedLayer);
 
     animate(
-        newAngle => selectedLayer.angle = newAngle, 
+        newAngle => setPersistentProperty(selectedLayer, layerNumber(args.layer), 'angle', newAngle),
         selectedLayer.angle,
         targetAngle,
         duration,
@@ -937,6 +990,17 @@ PluginManager.registerCommand('ODUE_screenTransform', 'restoreRotation', args =>
 
 PluginManager.registerCommand('ODUE_screenTransform', 'reset', args => {
     const selectedLayer = getLayer(args.layer);
+    const layerId = layerNumber(args.layer);
+    const state = OD._transform.persistentLayers[layerId];
+    state.scaleX = 1;
+    state.scaleY = 1;
+    state.angle = 0;
+    state.skewX = 0;
+    state.skewY = 0;
+    state.x = 0;
+    state.y = 0;
+    state.pivotX = 0;
+    state.pivotY = 0;
     selectedLayer.scale.x = 1;
     selectedLayer.scale.y = 1;
     selectedLayer.angle = 0;
